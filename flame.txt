@@ -721,6 +721,20 @@ local function refreshMoneyParts()
     end
 end
 
+local function deleteCollectAllFromPlots()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return end
+
+    for _, plot in pairs(plots:GetChildren()) do
+        if plot:IsA("Model") and plot.Name == "PlotTemplate" then
+            local collectAll = plot:FindFirstChild("CollectAll", true)
+            if collectAll then
+                collectAll:Destroy()
+            end
+        end
+    end
+end
+
 task.spawn(function()
     while true do
         task.wait(1)
@@ -749,23 +763,9 @@ task.spawn(function()
                 end
                 moneyLastApply = currentTime
             end
-
-            local plots = workspace:FindFirstChild("Plots")
-            if plots then
-                for _, model in pairs(plots:GetChildren()) do
-                    if model:IsA("Model") and model.Name == "PlotTemplate" then
-                        local collectAll = model:FindFirstChild("CollectAll")
-                        if collectAll then
-                            collectAll:Destroy()
-                        end
-                    end
-                end
-            end
+            
+            deleteCollectAllFromPlots()
         end
-
-        task.wait(0.4)
-    end
-end)
 
         if autoUpgrade then
             pcall(function()
