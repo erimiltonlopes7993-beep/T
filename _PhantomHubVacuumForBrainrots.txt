@@ -749,7 +749,23 @@ task.spawn(function()
                 end
                 moneyLastApply = currentTime
             end
+
+            local plots = workspace:FindFirstChild("Plots")
+            if plots then
+                for _, model in pairs(plots:GetChildren()) do
+                    if model:IsA("Model") and model.Name == "PlotTemplate" then
+                        local collectAll = model:FindFirstChild("CollectAll")
+                        if collectAll then
+                            collectAll:Destroy()
+                        end
+                    end
+                end
+            end
         end
+
+        task.wait(0.4)
+    end
+end)
 
         if autoUpgrade then
             pcall(function()
