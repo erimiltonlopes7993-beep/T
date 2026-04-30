@@ -1,0 +1,826 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.ResetOnSpawn = false
+
+local playerID = tostring(player.UserId)
+local dataKey = "PhantomHub_" .. playerID
+
+local autoMoney = false
+local autoUpgrade = false
+local autoUpgradeBrainrots = false
+local autoRebirth = false
+local autoVacuum = false
+local autoSpeed = false
+local autoCarry = false
+local autoSecret = false
+local autoCelestial = false
+local autoAdmin = false
+local autoExclusive = false
+local autoDivine = false
+local autoGOD = false
+local autoIndex = false
+
+local selectedMutations = {
+    Normal = true,
+    Golden = true,
+    Diamond = true,
+    Galaxy = true
+}
+
+local indexExpanded = false
+
+local RemoteBank = require(ReplicatedStorage:WaitForChild("RemoteBank"))
+local UpgradeRemote = ReplicatedStorage:WaitForChild("Utilities"):WaitForChild("TypedRemote"):WaitForChild("UpgradeStand")
+
+local draggingButton = false
+local dragInput, dragStart, startPos
+
+local function createCorner(obj, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius)
+    c.Parent = obj
+end
+
+local function createStroke(obj, thickness, color)
+    local s = Instance.new("UIStroke")
+    s.Thickness = thickness
+    s.Color = color
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = obj
+end
+
+local function saveState()
+    local state = {
+        autoMoney = autoMoney,
+        autoUpgrade = autoUpgrade,
+        autoUpgradeBrainrots = autoUpgradeBrainrots,
+        autoRebirth = autoRebirth,
+        autoVacuum = autoVacuum,
+        autoSpeed = autoSpeed,
+        autoCarry = autoCarry,
+        autoSecret = autoSecret,
+        autoCelestial = autoCelestial,
+        autoAdmin = autoAdmin,
+        autoExclusive = autoExclusive,
+        autoDivine = autoDivine,
+        autoGOD = autoGOD,
+        autoIndex = autoIndex,
+        selectedMutations = selectedMutations,
+        indexExpanded = indexExpanded
+    }
+    local json = game:GetService("HttpService"):JSONEncode(state)
+    writefile("PhantomHub_" .. playerID .. ".json", json)
+end
+
+local function loadState()
+    local success = pcall(function()
+        local json = readfile("PhantomHub_" .. playerID .. ".json")
+        local state = game:GetService("HttpService"):JSONDecode(json)
+        autoMoney = state.autoMoney or false
+        autoUpgrade = state.autoUpgrade or false
+        autoUpgradeBrainrots = state.autoUpgradeBrainrots or false
+        autoRebirth = state.autoRebirth or false
+        autoVacuum = state.autoVacuum or false
+        autoSpeed = state.autoSpeed or false
+        autoCarry = state.autoCarry or false
+        autoSecret = state.autoSecret or false
+        autoCelestial = state.autoCelestial or false
+        autoAdmin = state.autoAdmin or false
+        autoExclusive = state.autoExclusive or false
+        autoDivine = state.autoDivine or false
+        autoGOD = state.autoGOD or false
+        autoIndex = state.autoIndex or false
+        selectedMutations = state.selectedMutations or {Normal = true, Golden = true, Diamond = true, Galaxy = true}
+        indexExpanded = false
+    end)
+end
+
+loadState()
+
+local button = Instance.new("TextButton", gui)
+button.Size = UDim2.new(0, 55, 0, 55)
+button.Position = UDim2.new(0, 20, 0.5, -30)
+button.BackgroundColor3 = Color3.fromRGB(0,0,0)
+button.Text = "P"
+button.TextColor3 = Color3.fromRGB(255,255,255)
+button.TextSize = 26
+button.Font = Enum.Font.GothamBold
+createCorner(button, 12)
+createStroke(button, 3, Color3.fromRGB(120,120,120))
+
+local menu = Instance.new("Frame", gui)
+menu.Size = UDim2.new(0, 260, 0, 60)
+menu.Position = UDim2.new(0.5, -130, 0, 60)
+menu.BackgroundColor3 = Color3.fromRGB(0,0,0)
+menu.Visible = false
+createCorner(menu, 12)
+createStroke(menu, 3, Color3.fromRGB(120,120,120))
+
+local title = Instance.new("TextButton", menu)
+title.Size = UDim2.new(1, 0, 0, 60)
+title.BackgroundTransparency = 1
+title.Text = "Phantom Hub →"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+
+local divider = Instance.new("Frame", menu)
+divider.Size = UDim2.new(1, -20, 0, 2)
+divider.Position = UDim2.new(0, 10, 0, 60)
+divider.BackgroundColor3 = Color3.fromRGB(120,120,120)
+divider.Visible = false
+
+local viewport = Instance.new("Frame", menu)
+viewport.Size = UDim2.new(1, 0, 0, 200)
+viewport.Position = UDim2.new(0, 0, 0, 62)
+viewport.BackgroundTransparency = 1
+viewport.ClipsDescendants = true
+viewport.Visible = false
+
+local container = Instance.new("Frame", viewport)
+container.Size = UDim2.new(1, 0, 0, 1000)
+container.BackgroundTransparency = 1
+
+local scrollY = 0
+local scrolling = false
+local scrollStart
+
+viewport.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        scrolling = true
+        scrollStart = input.Position.Y
+    end
+end)
+
+viewport.InputEnded:Connect(function(input)
+    scrolling = false
+end)
+
+viewport.InputChanged:Connect(function(input)
+    if scrolling then
+        local delta = input.Position.Y - scrollStart
+        scrollY = math.clamp(scrollY + delta, -800, 0)
+        container.Position = UDim2.new(0,0,0,scrollY)
+        scrollStart = input.Position.Y
+        input:Block()
+    end
+end)
+
+local function createOptionWithBox(name, yPos)
+    local box = Instance.new("Frame", container)
+    box.Size = UDim2.new(1, -20, 0, 40)
+    box.Position = UDim2.new(0, 10, 0, yPos)
+    box.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    createCorner(box, 8)
+    createStroke(box, 2, Color3.fromRGB(150, 150, 150))
+
+    local label = Instance.new("TextLabel", box)
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local toggle = Instance.new("TextButton", box)
+    toggle.Size = UDim2.new(0, 50, 0, 25)
+    toggle.Position = UDim2.new(1, -60, 0.5, -12)
+    toggle.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    toggle.Text = ""
+    createCorner(toggle, 12)
+
+    return toggle, box
+end
+
+local function createRejoinButton(yPos)
+    local box = Instance.new("Frame", container)
+    box.Size = UDim2.new(1, -20, 0, 40)
+    box.Position = UDim2.new(0, 10, 0, yPos)
+    box.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    createCorner(box, 8)
+    createStroke(box, 2, Color3.fromRGB(150, 150, 150))
+
+    local label = Instance.new("TextButton", box)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "Auto Rejoin"
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+
+    return label, box
+end
+
+local function createIndexOption(yPos)
+    local box = Instance.new("Frame", container)
+    box.Size = UDim2.new(1, -20, 0, 40)
+    box.Position = UDim2.new(0, 10, 0, yPos)
+    box.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    box.Name = "IndexOptionBox"
+    createCorner(box, 8)
+    createStroke(box, 2, Color3.fromRGB(150, 150, 150))
+
+    local label = Instance.new("TextLabel", box)
+    label.Size = UDim2.new(0.5, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "Auto Index"
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local arrowButton = Instance.new("TextButton", box)
+    arrowButton.Size = UDim2.new(0, 30, 0, 20)
+    arrowButton.Position = UDim2.new(0.5, 5, 0.5, -10)
+    arrowButton.BackgroundTransparency = 1
+    arrowButton.Text = "→"
+    arrowButton.TextColor3 = Color3.fromRGB(255,255,255)
+    arrowButton.TextSize = 16
+    arrowButton.Font = Enum.Font.GothamBold
+    arrowButton.Name = "ArrowButton"
+
+    local toggle = Instance.new("TextButton", box)
+    toggle.Size = UDim2.new(0, 50, 0, 25)
+    toggle.Position = UDim2.new(1, -60, 0.5, -12)
+    toggle.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    toggle.Text = ""
+    createCorner(toggle, 12)
+
+    return toggle, box, arrowButton
+end
+
+local function createMutationSelector()
+    local selectorContainer = Instance.new("Frame", container)
+    selectorContainer.Size = UDim2.new(1, -20, 0, 200)
+    selectorContainer.Position = UDim2.new(0, 10, 0, 760)
+    selectorContainer.BackgroundTransparency = 1
+    selectorContainer.Name = "MutationSelectorContainer"
+    selectorContainer.Visible = false
+
+    local selectorFrame = Instance.new("Frame", selectorContainer)
+    selectorFrame.Size = UDim2.new(1, 0, 1, 0)
+    selectorFrame.Position = UDim2.new(0, 0, 0, 0)
+    selectorFrame.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+    selectorFrame.Name = "MutationSelector"
+    createCorner(selectorFrame, 8)
+    createStroke(selectorFrame, 2, Color3.fromRGB(150, 150, 150))
+
+    local mutations = {"Normal", "Golden", "Diamond", "Galaxy"}
+    
+    for i, mutation in ipairs(mutations) do
+        local mutationBox = Instance.new("Frame", selectorFrame)
+        mutationBox.Size = UDim2.new(1, -10, 0, 35)
+        mutationBox.Position = UDim2.new(0, 5, 0, 5 + (i-1) * 40)
+        mutationBox.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+        mutationBox.Name = mutation .. "Box"
+        createCorner(mutationBox, 6)
+        createStroke(mutationBox, 1, Color3.fromRGB(150, 150, 150))
+
+        local mutationLabel = Instance.new("TextLabel", mutationBox)
+        mutationLabel.Size = UDim2.new(0.7, 0, 1, 0)
+        mutationLabel.Position = UDim2.new(0, 10, 0, 0)
+        mutationLabel.BackgroundTransparency = 1
+        mutationLabel.Text = mutation
+        mutationLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        mutationLabel.TextSize = 14
+        mutationLabel.Font = Enum.Font.Gotham
+        mutationLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local mutationToggle = Instance.new("TextButton", mutationBox)
+        mutationToggle.Size = UDim2.new(0, 40, 0, 20)
+        mutationToggle.Position = UDim2.new(1, -50, 0.5, -10)
+        mutationToggle.BackgroundColor3 = selectedMutations[mutation] and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(120, 120, 120)
+        mutationToggle.Text = ""
+        mutationToggle.Name = mutation .. "Toggle"
+        createCorner(mutationToggle, 4)
+
+        mutationToggle.MouseButton1Click:Connect(function()
+            selectedMutations[mutation] = not selectedMutations[mutation]
+            mutationToggle.BackgroundColor3 = selectedMutations[mutation] and Color3.fromRGB(0, 120, 255) or Color3.fromRGB(120, 120, 120)
+            saveState()
+        end)
+    end
+
+    return selectorContainer
+end
+
+local rejoinButton, rejoinBox = createRejoinButton(10)
+local toggle1, box1 = createOptionWithBox("Auto Money", 60)
+local toggle2, box2 = createOptionWithBox("Auto Upgrade Base", 110)
+local toggle2b, box2b = createOptionWithBox("Auto Upgrade Brainrots", 160)
+local toggle3, box3 = createOptionWithBox("Auto Rebirth", 210)
+local toggle4, box4 = createOptionWithBox("Auto Vacuum", 260)
+local toggle5, box5 = createOptionWithBox("Auto Speed", 310)
+local toggle6, box6 = createOptionWithBox("Auto Carry", 360)
+local toggle7, box7 = createOptionWithBox("Auto Secret", 410)
+local toggle8, box8 = createOptionWithBox("Auto Celestial", 460)
+local toggle9, box9 = createOptionWithBox("Auto Admin", 510)
+local toggle10, box10 = createOptionWithBox("Auto Exclusive", 560)
+local toggle11, box11 = createOptionWithBox("Auto Divine", 610)
+local toggle12, box12 = createOptionWithBox("Auto GOD", 660)
+local toggleIndex, boxIndex, arrowButton = createIndexOption(710)
+local mutationSelector = createMutationSelector()
+
+local expanded = false
+
+title.MouseButton1Click:Connect(function()
+    expanded = not expanded
+    if expanded then
+        title.Text = "Phantom Hub ↓"
+        divider.Visible = true
+        viewport.Visible = true
+        menu:TweenSize(UDim2.new(0, 260, 0, 310), "Out", "Quad", 0.2, true)
+    else
+        title.Text = "Phantom Hub →"
+        divider.Visible = false
+        viewport.Visible = false
+        menu:TweenSize(UDim2.new(0, 260, 0, 60), "Out", "Quad", 0.2, true)
+    end
+end)
+
+local function updateToggleColor(toggle, state)
+    toggle.BackgroundColor3 = state and Color3.fromRGB(0,120,255) or Color3.fromRGB(100,100,100)
+end
+
+updateToggleColor(toggle1, autoMoney)
+updateToggleColor(toggle2, autoUpgrade)
+updateToggleColor(toggle2b, autoUpgradeBrainrots)
+updateToggleColor(toggle3, autoRebirth)
+updateToggleColor(toggle4, autoVacuum)
+updateToggleColor(toggle5, autoSpeed)
+updateToggleColor(toggle6, autoCarry)
+updateToggleColor(toggle7, autoSecret)
+updateToggleColor(toggle8, autoCelestial)
+updateToggleColor(toggle9, autoAdmin)
+updateToggleColor(toggle10, autoExclusive)
+updateToggleColor(toggle11, autoDivine)
+updateToggleColor(toggle12, autoGOD)
+updateToggleColor(toggleIndex, autoIndex)
+
+arrowButton.MouseButton1Click:Connect(function()
+    indexExpanded = not indexExpanded
+    if indexExpanded then
+        arrowButton.Text = "↓"
+        mutationSelector.Visible = true
+    else
+        arrowButton.Text = "→"
+        mutationSelector.Visible = false
+    end
+    saveState()
+end)
+
+rejoinButton.MouseButton1Click:Connect(function()
+    local TeleportService = game:GetService("TeleportService")
+    local placeID = game.PlaceId
+    local servers = game:HttpGet("https://games.roblox.com/v1/games/" .. placeID .. "/servers/Public?sortOrder=Asc&limit=100")
+    servers = game:GetService("HttpService"):JSONDecode(servers)
+    
+    if servers and #servers.data > 0 then
+        local randomServer = servers.data[math.random(#servers.data)]
+        TeleportService:TeleportToPlaceInstance(placeID, randomServer.id, player)
+    end
+end)
+
+toggle1.MouseButton1Click:Connect(function()
+    autoMoney = not autoMoney
+    updateToggleColor(toggle1, autoMoney)
+    saveState()
+end)
+
+toggle2.MouseButton1Click:Connect(function()
+    autoUpgrade = not autoUpgrade
+    updateToggleColor(toggle2, autoUpgrade)
+    saveState()
+end)
+
+toggle2b.MouseButton1Click:Connect(function()
+    autoUpgradeBrainrots = not autoUpgradeBrainrots
+    updateToggleColor(toggle2b, autoUpgradeBrainrots)
+    saveState()
+end)
+
+toggle3.MouseButton1Click:Connect(function()
+    autoRebirth = not autoRebirth
+    updateToggleColor(toggle3, autoRebirth)
+    saveState()
+end)
+
+toggle4.MouseButton1Click:Connect(function()
+    autoVacuum = not autoVacuum
+    updateToggleColor(toggle4, autoVacuum)
+    saveState()
+end)
+
+toggle5.MouseButton1Click:Connect(function()
+    autoSpeed = not autoSpeed
+    updateToggleColor(toggle5, autoSpeed)
+    saveState()
+end)
+
+toggle6.MouseButton1Click:Connect(function()
+    autoCarry = not autoCarry
+    updateToggleColor(toggle6, autoCarry)
+    saveState()
+end)
+
+toggle7.MouseButton1Click:Connect(function()
+    autoSecret = not autoSecret
+    updateToggleColor(toggle7, autoSecret)
+    saveState()
+end)
+
+toggle8.MouseButton1Click:Connect(function()
+    autoCelestial = not autoCelestial
+    updateToggleColor(toggle8, autoCelestial)
+    saveState()
+end)
+
+toggle9.MouseButton1Click:Connect(function()
+    autoAdmin = not autoAdmin
+    updateToggleColor(toggle9, autoAdmin)
+    saveState()
+end)
+
+toggle10.MouseButton1Click:Connect(function()
+    autoExclusive = not autoExclusive
+    updateToggleColor(toggle10, autoExclusive)
+    saveState()
+end)
+
+toggle11.MouseButton1Click:Connect(function()
+    autoDivine = not autoDivine
+    updateToggleColor(toggle11, autoDivine)
+    saveState()
+end)
+
+toggle12.MouseButton1Click:Connect(function()
+    autoGOD = not autoGOD
+    updateToggleColor(toggle12, autoGOD)
+    saveState()
+end)
+
+toggleIndex.MouseButton1Click:Connect(function()
+    autoIndex = not autoIndex
+    updateToggleColor(toggleIndex, autoIndex)
+    saveState()
+end)
+
+button.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingButton = false
+        dragStart = input.Position
+        startPos = button.Position
+    end
+end)
+
+button.InputChanged:Connect(function(input)
+    dragInput = input
+end)
+
+RunService.RenderStepped:Connect(function()
+    if dragInput and (dragInput.Position - dragStart).Magnitude > 10 then
+        draggingButton = true
+    end
+
+    if draggingButton then
+        local delta = dragInput.Position - dragStart
+        button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+button.MouseButton1Up:Connect(function()
+    if not draggingButton then
+        menu.Visible = not menu.Visible
+    end
+end)
+
+local cachedPlot
+local cachedParts = {}
+local lastScan = 0
+
+local function findPlot()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return end
+
+    for _, plot in pairs(plots:GetChildren()) do
+        local tag = plot:FindFirstChild("BillboardSpawnPart", true)
+        if tag then
+            local label = tag:FindFirstChild("TextLabel", true)
+            if label and label.Text == player.Name then
+                return plot
+            end
+        end
+    end
+end
+
+local function findMeshPartInModel(model, rarityText)
+    local rarityLabel = nil
+    
+    for _, descendant in pairs(model:GetDescendants()) do
+        if descendant.Name == "RarityLabel" and descendant:IsA("TextLabel") then
+            if descendant.Text == rarityText then
+                rarityLabel = descendant
+                break
+            end
+        end
+    end
+    
+    if rarityLabel then
+        for _, descendant in pairs(model:GetDescendants()) do
+            if descendant.ClassName == "MeshPart" then
+                return descendant
+            end
+        end
+    end
+    
+    return nil
+end
+
+local function findPlayerBase()
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+    
+    for _, plot in pairs(plots:GetChildren()) do
+        local tag = plot:FindFirstChild("BillboardSpawnPart", true)
+        if tag then
+            local label = tag:FindFirstChild("TextLabel", true)
+            if label and label.Text == player.Name then
+                return plot
+            end
+        end
+    end
+    
+    return nil
+end
+
+local teleportCFrame = CFrame.new(94.9108829, 70.4400024, 2.796, 1, 0, 0, 0, 1, 0, 0, 0, 1)
+
+local function collectRarity(rarityType)
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local entitiesFolder = workspace:FindFirstChild("EntitiesFolder")
+    if not entitiesFolder then return end
+    
+    for _, model in pairs(entitiesFolder:GetChildren()) do
+        if model:IsA("Model") then
+            local meshPart = findMeshPartInModel(model, rarityType)
+            if meshPart then
+                player.Character.HumanoidRootPart.CFrame = meshPart.CFrame
+                task.wait(0.3)
+                
+                for _, descendant in pairs(model:GetDescendants()) do
+                    if descendant:IsA("ProximityPrompt") then
+                        pcall(function()
+                            fireproximityprompt(descendant)
+                        end)
+                        break
+                    end
+                end
+                
+                task.wait(0.5)
+                player.Character.HumanoidRootPart.CFrame = teleportCFrame
+                
+                return
+            end
+        end
+    end
+end
+
+local function getMutationLabelFromModel(model)
+    for _, descendant in pairs(model:GetDescendants()) do
+        if descendant.Name == "MutationLabel" and descendant:IsA("TextLabel") then
+            return descendant.Text
+        end
+    end
+    return "Normal"
+end
+
+local function getUnlockedList(mutation)
+    local success, result = pcall(function()
+        local DataService = require(ReplicatedStorage:WaitForChild("Utilities"):WaitForChild("DataService"))
+        return DataService.client:get({"index", mutation})
+    end)
+    
+    if success and result and type(result) == "table" then
+        return result
+    end
+    
+    return {}
+end
+
+local function collectIndexEntity()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local entitiesFolder = workspace:FindFirstChild("EntitiesFolder")
+    if not entitiesFolder then return end
+    
+    for _, model in pairs(entitiesFolder:GetChildren()) do
+        if model:IsA("Model") then
+            local modelMutation = getMutationLabelFromModel(model)
+            
+            if selectedMutations[modelMutation] then
+                local unlockedList = getUnlockedList(modelMutation)
+                local isUnlocked = table.find(unlockedList, model.Name) ~= nil
+                
+                if not isUnlocked then
+                    local meshPart = nil
+                    for _, descendant in pairs(model:GetDescendants()) do
+                        if descendant.ClassName == "MeshPart" then
+                            meshPart = descendant
+                            break
+                        end
+                    end
+                    
+                    if meshPart then
+                        player.Character.HumanoidRootPart.CFrame = meshPart.CFrame
+                        task.wait(0.3)
+                        
+                        for _, descendant in pairs(model:GetDescendants()) do
+                            if descendant:IsA("ProximityPrompt") then
+                                pcall(function()
+                                    fireproximityprompt(descendant)
+                                end)
+                                break
+                            end
+                        end
+                        
+                        task.wait(0.5)
+                        player.Character.HumanoidRootPart.CFrame = teleportCFrame
+                        
+                        return
+                    end
+                end
+            end
+        end
+    end
+end
+
+local brainrotLastFire = 0
+local brainrotCooldown = 0.1
+local moneyLastApply = 0
+local moneyCooldown = 0.2
+
+local myMoneyPlot = nil
+local cachedMoneyParts = {}
+
+local function isMyMoneyPlot(plot)
+    local billboard = plot:FindFirstChild("HomeBillboard", true)
+    if not billboard then return false end
+
+    for _, v in pairs(billboard:GetDescendants()) do
+        if v:IsA("TextLabel") then
+            local text = string.lower(v.Text)
+            local name = string.lower(player.Name)
+            local display = string.lower(player.DisplayName)
+
+            if string.find(text, name) or string.find(text, display) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function findMyMoneyPlot()
+    for _, plot in pairs(workspace:GetDescendants()) do
+        if plot:IsA("Model") and plot.Name == "PlotTemplate" then
+            if isMyMoneyPlot(plot) then
+                return plot
+            end
+        end
+    end
+    return nil
+end
+
+local function refreshMoneyParts()
+    cachedMoneyParts = {}
+
+    if not myMoneyPlot or not myMoneyPlot.Parent then
+        myMoneyPlot = findMyMoneyPlot()
+    end
+
+    if not myMoneyPlot then return end
+
+    for _, v in pairs(myMoneyPlot:GetDescendants()) do
+        if v:IsA("BasePart") and v.Name == "TouchPart" then
+            table.insert(cachedMoneyParts, v)
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(1)
+        refreshMoneyParts()
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if tick() - lastScan > 5 then
+            lastScan = tick()
+        end
+
+        if autoMoney and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local currentTime = tick()
+            if currentTime - moneyLastApply >= moneyCooldown then
+                local char = player.Character
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    for _, v in pairs(cachedMoneyParts) do
+                        if v and v.Parent then
+                            firetouchinterest(root, v, 0)
+                            firetouchinterest(root, v, 1)
+                        end
+                    end
+                end
+                moneyLastApply = currentTime
+            end
+        end
+
+        if autoUpgrade then
+            pcall(function()
+                RemoteBank.UpgradeBaseSign:FireServer()
+            end)
+        end
+
+        if autoUpgradeBrainrots then
+            local currentTime = tick()
+            if currentTime - brainrotLastFire >= brainrotCooldown then
+                for i = 1, 50 do
+                    pcall(function()
+                        UpgradeRemote:FireServer(i)
+                    end)
+                end
+                brainrotLastFire = currentTime
+            end
+        end
+
+        if autoRebirth then
+            pcall(function()
+                RemoteBank.Rebirth:InvokeServer()
+            end)
+        end
+
+        if autoVacuum then
+            pcall(function()
+                RemoteBank.PurchaseUpgrade:FireServer("VacuumPowerUpgrade2")
+            end)
+        end
+
+        if autoSpeed then
+            pcall(function()
+                RemoteBank.PurchaseUpgrade:FireServer("SpeedUpgrade")
+            end)
+        end
+
+        if autoCarry then
+            pcall(function()
+                RemoteBank.PurchaseUpgrade:FireServer("GrabUpgrade")
+            end)
+        end
+
+        if autoSecret then
+            collectRarity("Secret")
+        end
+
+        if autoCelestial then
+            collectRarity("Celestial")
+        end
+
+        if autoAdmin then
+            collectRarity("Admin")
+        end
+
+        if autoExclusive then
+            collectRarity("Exclusive")
+        end
+
+        if autoDivine then
+            collectRarity("Divine")
+        end
+
+        if autoGOD then
+            collectRarity("GOD")
+        end
+
+        if autoIndex then
+            collectIndexEntity()
+        end
+
+        task.wait(0.4)
+    end
+end)
